@@ -1,0 +1,6 @@
+@ASI.MiniModelagem_HostAddress = http://localhost:5253
+
+GET {{ASI.MiniModelagem_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
