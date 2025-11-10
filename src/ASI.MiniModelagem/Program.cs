@@ -1,29 +1,39 @@
 using ASI.MiniModelagem.Data;
 using ASI.MiniModelagem.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1) Registra o EF Core com SQLite (cria/usa o arquivo asi.db)
+// EF Core + SQLite (arquivo asi.db na pasta do projeto)
 builder.Services.AddDbContext<AppDbContext>(opt =>
     opt.UseSqlite("Data Source=asi.db"));
 
-// 2) Swagger para testar a API no navegador
+// Swagger (UI para testar a API)
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Evitar ciclos de referência ao serializar (Professor <-> Departamento, etc.)
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+    options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+});
+
 var app = builder.Build();
 
-// 3) Ativa Swagger em Ambiente de Desenvolvimento
+// Swagger só no Development
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
+// Se não tiver porta HTTPS configurada, esse middleware só gera um aviso.
+// Se quiser, pode comentar a linha abaixo.
 app.UseHttpsRedirection();
 
-// 4) Agrupa as rotas sob /api
+// Agrupar rotas em /api
 var api = app.MapGroup("/api");
 
 // ------------------- DEPARTAMENTOS -------------------
@@ -86,8 +96,10 @@ api.MapPut("/professores/{id:int}", async (int id, Professor input, AppDbContext
 {
     var p = await db.Professores.FindAsync(id);
     if (p is null) return Results.NotFound();
+
     if (!await db.Departamentos.AnyAsync(d => d.Id == input.DepartamentoId))
         return Results.BadRequest($"Departamento {input.DepartamentoId} não existe");
+
     p.Nome = input.Nome;
     p.DepartamentoId = input.DepartamentoId;
     await db.SaveChangesAsync();
